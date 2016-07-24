@@ -1,0 +1,122 @@
+---
+title: "Get Historical Foreign Currency Rates from the Federal Reserve"
+author: "Sharon Francisco"
+date: "July 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+The Federal Reserve posts historical foreign currency exchange rates for several currencies. This code gets the historical rates for British pounds (GBP).
+
+The steps for extracting the data was obtained [here](http://statistics.berkeley.edu/computing/r-reading-webpages). 
+
+
+## Installing Packages and Loading Libraries 
+The packages used in the analysis are installed below.
+
+```{r installAndLoadPackages}
+if(!require(dplyr, quietly = TRUE)) install.packages("dplyr")
+library(dplyr)
+if(!require(xlsx, quietly = TRUE)) install.packages("xlsx")
+library(xlsx)
+```
+
+## Set Root Directory and Load File
+
+
+```{r setRootDir}
+rootDir <- "C:/Users/b1050549/Documents/Anti_Corruption/0_ISC_payments/00_analysis_code"
+
+knitr::opts_knit$set(root.dir = rootDir)
+```
+
+Download forex history from [federalreserve.gov](http://www.federalreserve.gov/releases/h10/hist/default.htm).
+
+```{r downloadForexHistory}
+gbpFileUrl <- "http://www.federalreserve.gov/releases/h10/hist/dat00_uk.htm"
+euroFileUrl <- "http://www.federalreserve.gov/releases/h10/hist/dat00_eu.htm"
+
+data <- readLines(gbpFileUrl)
+head(data, 250)
+```
+
+After examining the html code, I found the HTML tags for the dates and rates in the table. I'll get the lines that have these tags.
+
+```{r getDatesRatesHtml}
+datePattern <- "<th id=\"r1\" headers=\"a1\">([^<]*)</th>"
+ratePattern <- "<td headers=\"a2 a1 r1\">([^<]*)</td>"
+
+dateLines <- grep(datePattern, data, value = TRUE)
+head(dateLines, 25)
+
+rateLines <- grep(ratePattern, data, value = TRUE)
+head(rateLines, 25)
+```
+
+I'll take the html tags off the data.
+
+```{r removeHTML}
+dateHead <- "<th id=\"r1\" headers=\"a1\">"
+dateEnd <- "</th>"
+dates <- gsub(dateHead, "", dateLines)
+dates <- gsub(dateEnd, "", dates)
+head(dates, 25)
+
+rateHead <- "<td headers=\"a2 a1 r1\">"
+rateEnd <- "</td>"
+rates <- gsub(rateHead, "", rateLines)
+rates <- gsub(rateEnd, "", rates)
+head(rates, 25)
+```
+
+Next, I'll remove the white/blank spaces in the data.
+
+```{r removeWhiteSpaces}
+dates <- trimws(dates)
+rates <- trimws(rates)
+head(dates, 25)
+head(rates, 25)
+```
+
+I'll reformat the dates as dates.
+
+```{r reformatDates}
+dates <- strptime(dates, "%d-%b-%y")
+class(dates)
+head(dates, 25)
+```
+
+
+I'll convert the *ND* values in the rates data to the NA logical constant. Then I'll convert the vector to numeric.
+
+```{r convertNDs}
+ConvertND <- function(vector) {
+        for(i in seq_along(vector)) {
+                if(vector[i] == "ND") {
+                        is.na(vector[i]) <- TRUE
+                }
+        }
+        vector
+}
+
+rates <- ConvertND(rates)
+rates <- as.numeric(rates)
+head(rates, 25)
+```
+
+Now, I'll bind the columns and name them.
+
+```{r bindColumns}
+dates <- as.data.frame(dates)
+rates <- as.data.frame(rates)
+forex <- bind_cols(dates, rates)
+names(forex) <- c("Date", "Rate")
+forex
+```
+
+
